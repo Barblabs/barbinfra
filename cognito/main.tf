@@ -7,7 +7,7 @@ locals {
 # barbackend's Postgres, keyed by the sub.
 resource "aws_cognito_user_pool" "users" {
   name                = local.name
-  user_pool_tier      = "ESSENTIALS"
+  user_pool_tier      = "LITE"
   deletion_protection = "ACTIVE"
 
   # barbackend's AdminCreateUser passes the email as the username.
