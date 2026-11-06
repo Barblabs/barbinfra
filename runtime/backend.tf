@@ -1,6 +1,10 @@
 locals {
   api_domain = "api.${var.domain_name}"
 
+  # The deploy role targets the instance by this tag. A local rather than the
+  # instance's attribute keeps the role's policy readable in the plan.
+  backend_instance_name = "${local.name}-backend"
+
   # Outside backend_config_path so the tag never lands in serve's env.
   image_tag_parameter = "/barbattack/${var.environment}/deploy/image_tag"
 
@@ -166,7 +170,7 @@ resource "aws_instance" "backend" {
   })
 
   tags = {
-    Name = "${local.name}-backend"
+    Name = local.backend_instance_name
   }
 
   # A newer AMI would otherwise replace the instance at the next apply, taking
