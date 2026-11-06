@@ -1,0 +1,25 @@
+[Unit]
+Description=Caddy, the TLS front for barbackend
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+EnvironmentFile=/etc/barbackend/host.env
+ExecStartPre=-/usr/bin/docker rm -f caddy
+# The caddy_data volume keeps the Let's Encrypt certificate across restarts,
+# which matters because Let's Encrypt allows only 5 per week for one name.
+ExecStart=/usr/bin/docker run --rm --name caddy --network barbackend \
+  -p 80:80 -p 443:443 \
+  -v /etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v caddy_data:/data -v caddy_config:/config \
+  --log-driver awslogs \
+  --log-opt awslogs-region=${AWS_REGION} \
+  --log-opt awslogs-group=${CADDY_LOG_GROUP} \
+  caddy:2
+ExecStop=/usr/bin/docker stop caddy
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

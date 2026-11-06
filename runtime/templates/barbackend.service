@@ -1,0 +1,28 @@
+[Unit]
+Description=barbackend serve
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+# barbackend-deploy writes this file; until the first deploy there is nothing to run.
+ConditionPathExists=/etc/barbackend/image
+
+[Service]
+EnvironmentFile=/etc/barbackend/host.env
+# Sets BACKEND_IMAGE, the image the last deploy pulled and migrated.
+EnvironmentFile=/etc/barbackend/image
+ExecStartPre=-/usr/bin/docker rm -f barbackend
+ExecStart=/usr/bin/docker run --rm --name barbackend --network barbackend \
+  --env-file /etc/barbackend/env \
+  -v /etc/barbackend/rds-ca.pem:/etc/rds-ca.pem:ro \
+  --log-driver awslogs \
+  --log-opt awslogs-region=${AWS_REGION} \
+  --log-opt awslogs-group=${BACKEND_LOG_GROUP} \
+  ${BACKEND_IMAGE} serve
+# Longer than serve's own 10-second shutdown budget, so serve finishes it
+# before Docker kills the container.
+ExecStop=/usr/bin/docker stop --time 15 barbackend
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
