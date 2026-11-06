@@ -1,7 +1,8 @@
 locals {
   # Each deploy role trusts only its own repo's production environment.
   github_deploy_subjects = {
-    backend = var.backend_github_subject
+    backend   = var.backend_github_subject
+    dashboard = var.dashboard_github_subject
   }
 }
 
@@ -89,4 +90,36 @@ resource "aws_iam_role_policy" "backend_deploy" {
   name   = "deploy"
   role   = aws_iam_role.backend_deploy.id
   policy = data.aws_iam_policy_document.backend_deploy.json
+}
+
+resource "aws_iam_role" "dashboard_deploy" {
+  name               = "${local.name}-dashboard-deploy"
+  assume_role_policy = data.aws_iam_policy_document.github_deploy_assume["dashboard"].json
+}
+
+data "aws_iam_policy_document" "dashboard_deploy" {
+  # aws s3 sync lists the bucket to decide what to upload and what to prune.
+  statement {
+    sid       = "ListBucket"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.dashboard.arn]
+  }
+
+  statement {
+    sid       = "WriteObjects"
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.dashboard.arn}/*"]
+  }
+
+  statement {
+    sid       = "InvalidateDistribution"
+    actions   = ["cloudfront:CreateInvalidation"]
+    resources = [aws_cloudfront_distribution.dashboard.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "dashboard_deploy" {
+  name   = "deploy"
+  role   = aws_iam_role.dashboard_deploy.id
+  policy = data.aws_iam_policy_document.dashboard_deploy.json
 }

@@ -7,7 +7,7 @@ locals {
     COGNITO_REGION       = local.cognito.region
     COGNITO_USER_POOL_ID = local.cognito.user_pool_id
     COGNITO_CLIENT_ID    = local.cognito.client_id
-    CORS_ALLOWED_ORIGINS = "https://app.${var.domain_name}"
+    CORS_ALLOWED_ORIGINS = "https://${local.app_domain}"
     PORT                 = "8080"
   }
 
