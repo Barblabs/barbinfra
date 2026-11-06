@@ -117,12 +117,11 @@ resource "aws_instance" "backend" {
   ami           = data.aws_ssm_parameter.al2023_arm64.insecure_value
   instance_type = "t4g.micro"
 
-  subnet_id              = aws_subnet.public[0].id
-  vpc_security_group_ids = [aws_security_group.backend.id]
-  iam_instance_profile   = aws_iam_instance_profile.backend.name
-  # user_data reaches dnf, Docker Hub, and ECR before the Elastic IP is
-  # attached, so the instance needs its own public IP at launch.
-  associate_public_ip_address = true
+  iam_instance_profile = aws_iam_instance_profile.backend.name
+
+  primary_network_interface {
+    network_interface_id = aws_network_interface.backend.id
+  }
 
   # T4g defaults to unlimited credits, which bills sustained CPU above the
   # baseline. Standard throttles instead, which suits this budget.
@@ -181,16 +180,30 @@ resource "aws_instance" "backend" {
 
   # The role's grants must exist before first boot, when user_data and the
   # first deploy call SSM, ECR, and Secrets Manager.
+  # user_data reaches dnf, Docker Hub, and ECR on first boot, so the Elastic IP
+  # must already be on the interface when the instance starts.
   depends_on = [
     aws_iam_role_policy.backend,
     aws_iam_role_policy_attachment.backend,
+    aws_eip.backend,
   ]
+}
+
+# The Elastic IP sits on this interface rather than on the instance, so it is
+# in place before first boot and survives instance replacement.
+resource "aws_network_interface" "backend" {
+  subnet_id       = aws_subnet.public[0].id
+  security_groups = [aws_security_group.backend.id]
+
+  tags = {
+    Name = "${local.name}-backend"
+  }
 }
 
 # Keeps api.<domain> on the same address when the instance is replaced.
 resource "aws_eip" "backend" {
-  domain   = "vpc"
-  instance = aws_instance.backend.id
+  domain            = "vpc"
+  network_interface = aws_network_interface.backend.id
 
   tags = {
     Name = "${local.name}-backend"
