@@ -1,0 +1,57 @@
+#!/bin/bash
+# cloud-init runs this once, at the instance's first boot.
+set -euo pipefail
+
+dnf install -y docker jq
+systemctl enable --now docker
+
+# migrate runs beside serve and Caddy during a deploy; on 1 GB of memory the
+# swap keeps that from reaching the out-of-memory killer.
+dd if=/dev/zero of=/swapfile bs=1M count=1024
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap defaults 0 0' >>/etc/fstab
+
+install -d -m 0755 /etc/barbackend /etc/caddy
+
+# RDS certificates are not in the public trust store, so sslmode=verify-full
+# needs this bundle. 0644 because the image runs as the non-root UID 65532.
+curl -fsSL -o /etc/barbackend/rds-ca.pem "${rds_ca_url}"
+chmod 0644 /etc/barbackend/rds-ca.pem
+
+docker network create barbackend
+
+cat >/etc/barbackend/host.env <<'EOF_HOST_ENV'
+AWS_REGION=${region}
+CADDY_LOG_GROUP=${caddy_log_group}
+BACKEND_LOG_GROUP=${backend_log_group}
+EOF_HOST_ENV
+
+cat >/etc/caddy/Caddyfile <<'EOF_CADDYFILE'
+${caddyfile}
+EOF_CADDYFILE
+
+cat >/usr/local/bin/barbackend-deploy <<'EOF_DEPLOY'
+${deploy_script}
+EOF_DEPLOY
+chmod 0755 /usr/local/bin/barbackend-deploy
+
+cat >/etc/systemd/system/caddy.service <<'EOF_CADDY_UNIT'
+${caddy_service}
+EOF_CADDY_UNIT
+
+cat >/etc/systemd/system/barbackend.service <<'EOF_BACKEND_UNIT'
+${barbackend_service}
+EOF_BACKEND_UNIT
+
+systemctl daemon-reload
+systemctl enable barbackend.service
+systemctl enable --now caddy.service
+
+# The parameter is missing until the first deploy. Once set, a replaced
+# instance comes back on the last release without waiting for the next one.
+if tag=$(aws ssm get-parameter --region "${region}" --name "${image_tag_parameter}" \
+  --query Parameter.Value --output text 2>/dev/null); then
+  /usr/local/bin/barbackend-deploy "$tag"
+fi

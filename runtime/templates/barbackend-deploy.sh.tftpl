@@ -1,0 +1,53 @@
+#!/bin/bash
+# Usage: barbackend-deploy <image tag>
+# Pulls the image, renders its env from SSM and the RDS secret, runs migrate,
+# and only if migrate succeeds restarts serve on the new image.
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "usage: barbackend-deploy <image tag>" >&2
+  exit 64
+fi
+
+tag=$1
+export AWS_REGION="${region}"
+registry="${ecr_registry}"
+image="${ecr_repository_url}:$tag"
+config_path="${config_path}/"
+db_secret_arn="${db_secret_arn}"
+db_host="${db_address}:${db_port}"
+db_name="${db_name}"
+image_tag_parameter="${image_tag_parameter}"
+
+aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+docker pull "$image"
+
+# mktemp creates the file 0600, and the env holds every secret serve uses.
+env_file=$(mktemp /etc/barbackend/env.XXXXXX)
+trap 'rm -f "$env_file"' EXIT
+
+aws ssm get-parameters-by-path --path "$config_path" --with-decryption --output json |
+  jq -r --arg prefix "$config_path" '.Parameters[] | "\(.Name | ltrimstr($prefix))=\(.Value)"' \
+    >>"$env_file"
+
+# The password goes from the secret to the file inside jq, so it never appears
+# in a shell variable or a process argument. @uri escapes characters that would
+# break the URL.
+aws secretsmanager get-secret-value --secret-id "$db_secret_arn" --query SecretString --output text |
+  jq -r --arg host "$db_host" --arg db "$db_name" \
+    '"DATABASE_URL=postgres://\(.username | @uri):\(.password | @uri)@\($host)/\($db)?sslmode=verify-full&sslrootcert=/etc/rds-ca.pem"' \
+    >>"$env_file"
+
+docker run --rm --network barbackend \
+  --env-file "$env_file" \
+  -v /etc/barbackend/rds-ca.pem:/etc/rds-ca.pem:ro \
+  "$image" migrate
+
+mv "$env_file" /etc/barbackend/env
+trap - EXIT
+printf 'BACKEND_IMAGE=%s\n' "$image" >/etc/barbackend/image
+# A replaced instance reads this at first boot to come back on the last release.
+aws ssm put-parameter --name "$image_tag_parameter" --type String --value "$tag" --overwrite >/dev/null
+
+systemctl restart barbackend.service
+echo "barbackend $tag deployed"

@@ -1,0 +1,9 @@
+${api_domain} {
+	reverse_proxy barbackend:8080 {
+		transport http {
+			# Above barbackend's 5-minute limit on Sync and Analista requests.
+			read_timeout 6m
+			write_timeout 6m
+		}
+	}
+}
