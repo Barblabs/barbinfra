@@ -73,7 +73,7 @@ The first apply waits until ACM sees the `app` certificate's validation record i
 
 ### Set the backend's secrets
 
-Terraform creates `CREDENTIALS_KEY`, `ANTHROPIC_API_KEY`, and `NVD_API_KEY` as placeholders and never reads them back, so their values stay out of state. Generate `CREDENTIALS_KEY` with `openssl rand -base64 32` and **store it in the team password manager first**: losing it makes every stored iTop credential unrecoverable. Then, for each of the three:
+Terraform creates `CREDENTIALS_KEY`, `ANTHROPIC_API_KEY`, `NVD_API_KEY`, `SLACK_CLIENT_ID`, and `SLACK_CLIENT_SECRET` as placeholders and never reads them back, so their values stay out of state. Generate `CREDENTIALS_KEY` with `openssl rand -base64 32` and **store it in the team password manager first**: losing it makes every stored iTop credential unrecoverable. The Slack values come from the Slack app's **Basic Information** page; `serve` does not start without them. Also add `https://api.barbattack.com/slack/install/callback` to the app's redirect URLs under **OAuth & Permissions**, or installing it from the portal fails. Then, for each of the five:
 
 ```sh
 read -rs value    # paste the value; it stays out of shell history

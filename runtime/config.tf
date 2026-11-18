@@ -9,12 +9,16 @@ locals {
     COGNITO_CLIENT_ID    = local.cognito.client_id
     CORS_ALLOWED_ORIGINS = "https://${local.app_domain}"
     PORT                 = "8080"
+    PORTAL_URL           = "https://${local.app_domain}"
+    SLACK_REDIRECT_URI   = "https://${local.api_domain}/slack/install/callback"
   }
 
   backend_secrets = toset([
     "CREDENTIALS_KEY",
     "ANTHROPIC_API_KEY",
     "NVD_API_KEY",
+    "SLACK_CLIENT_ID",
+    "SLACK_CLIENT_SECRET",
   ])
 }
 
