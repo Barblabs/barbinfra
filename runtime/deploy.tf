@@ -53,6 +53,7 @@ data "aws_iam_policy_document" "backend_deploy" {
       "ecr:CompleteLayerUpload",
       "ecr:PutImage",
       "ecr:BatchGetImage",
+      "ecr:DescribeImages",
     ]
     resources = [local.shared.ecr_repository_arn]
   }
