@@ -16,7 +16,6 @@ locals {
   backend_secrets = toset([
     "CREDENTIALS_KEY",
     "ANTHROPIC_API_KEY",
-    "NVD_API_KEY",
     "SLACK_CLIENT_ID",
     "SLACK_CLIENT_SECRET",
   ])
