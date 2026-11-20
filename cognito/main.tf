@@ -23,7 +23,7 @@ resource "aws_cognito_user_pool" "users" {
 
     invite_message_template {
       email_subject = "Your barbattack account"
-      email_message = "You have been invited to barbattack. Sign in with {username} and the temporary password {####}, then choose your own password."
+      email_message = "<p>You have been invited to barbattack. Your temporary password is <b>{####}</b>. It expires in 24 hours; sign in and choose your own password before then.</p><!-- {username} -->"
       sms_message   = "Your barbattack username is {username} and temporary password is {####}."
     }
   }
@@ -34,7 +34,7 @@ resource "aws_cognito_user_pool" "users" {
     require_uppercase                = true
     require_numbers                  = true
     require_symbols                  = true
-    temporary_password_validity_days = 7
+    temporary_password_validity_days = 1
   }
 
   account_recovery_setting {
