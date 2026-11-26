@@ -131,6 +131,57 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
 }
 
+resource "aws_cloudfront_response_headers_policy" "dashboard" {
+  name = "${local.name}-dashboard"
+
+  security_headers_config {
+    content_security_policy {
+      override = true
+      content_security_policy = join("; ", [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "img-src 'self' data:",
+        "font-src 'self'",
+        "connect-src 'self' https://${local.api_domain} https://cognito-idp.${local.cognito.region}.amazonaws.com",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+      ])
+    }
+
+    strict_transport_security {
+      override                   = true
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+    }
+
+    frame_options {
+      override     = true
+      frame_option = "DENY"
+    }
+
+    content_type_options {
+      override = true
+    }
+
+    referrer_policy {
+      override        = true
+      referrer_policy = "strict-origin-when-cross-origin"
+    }
+  }
+
+  remove_headers_config {
+    items {
+      header = "Server"
+    }
+    items {
+      header = "x-amz-server-side-encryption"
+    }
+  }
+}
+
 resource "aws_cloudfront_distribution" "dashboard" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -146,12 +197,13 @@ resource "aws_cloudfront_distribution" "dashboard" {
   }
 
   default_cache_behavior {
-    target_origin_id       = "dashboard"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
-    compress               = true
+    target_origin_id           = "dashboard"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD"]
+    cached_methods             = ["GET", "HEAD"]
+    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_optimized.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.dashboard.id
+    compress                   = true
   }
 
   # Deep links have no object in the bucket. Without s3:ListBucket, S3 answers
